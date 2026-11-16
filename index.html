@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>런메이트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: 앱처럼 쓰는 매칭 화면. 왼쪽 조건 설문(1~4단계), 오른쪽 날짜 스트립과 추천 모임 목록. 모바일에서는 위아래로 쌓임 */
+:root{
+  --bg:#F2F6F7;
+  --surface:#FFFFFF;
+  --ink:#0F1E26;
+  --muted:#5A6B74;
+  --line:#D9E3E6;
+  --river:#0A7385;
+  --river-soft:#E1F1F3;
+  --flare:#F2542D;
+  --flare-soft:#FFE9E3;
+  --ok:#1F8A4C;
+  --font-display:"Black Han Sans","IBM Plex Sans KR",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --radius:14px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B1418;--surface:#132128;--ink:#E7EFF1;--muted:#94A7AF;--line:#24363E;
+    --river:#43BFCD;--river-soft:#14323A;--flare:#FF7652;--flare-soft:#3A2019;--ok:#4CC27F;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B1418;--surface:#132128;--ink:#E7EFF1;--muted:#94A7AF;--line:#24363E;
+  --river:#43BFCD;--river-soft:#14323A;--flare:#FF7652;--flare-soft:#3A2019;--ok:#4CC27F;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--river);outline-offset:2px}
+h1,h2,h3{text-wrap:balance;margin:0}
+.num{font-variant-numeric:tabular-nums}
+
+/* header */
+.top{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-in{max-width:1120px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.logo{display:flex;align-items:baseline;gap:10px}
+.logo b{font-family:var(--font-display);font-weight:400;font-size:26px;color:var(--river);letter-spacing:-.5px}
+.logo span{font-size:13px;color:var(--muted)}
+.tabs{display:flex;gap:4px;margin-left:auto}
+.tab{border:0;background:transparent;padding:8px 14px;border-radius:999px;cursor:pointer;color:var(--muted);font-weight:600}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--surface)}
+.tab .cnt[hidden]{display:none}
+.tab .cnt{display:inline-block;min-width:18px;margin-left:4px;padding:0 5px;border-radius:9px;background:var(--flare);color:#fff;font-size:11px;line-height:18px}
+
+main{max-width:1120px;margin:0 auto;padding:20px 16px 64px}
+.view[hidden]{display:none}
+
+/* find layout */
+.find{display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start}
+@media (max-width:900px){.find{grid-template-columns:1fr}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+.survey{padding:18px;position:sticky;top:76px;max-height:calc(100vh - 92px);overflow:auto}
+@media (max-width:900px){.survey{position:static;max-height:none}}
+.survey h2{font-size:18px}
+.survey .lead{color:var(--muted);font-size:13px;margin:4px 0 14px}
+.step{border-top:1px solid var(--line);padding:14px 0 6px}
+.step-h{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-bottom:10px}
+.step-n{width:22px;height:22px;border-radius:50%;background:var(--river);color:#fff;font-size:12px;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+.q{margin-bottom:12px}
+.q-l{font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:500}
+.opts{display:flex;flex-wrap:wrap;gap:6px}
+.opt{border:1px solid var(--line);background:var(--surface);padding:6px 11px;border-radius:999px;font-size:13px;cursor:pointer;transition:background .12s,border-color .12s}
+.opt:hover{border-color:var(--river)}
+.opt[aria-pressed="true"]{background:var(--river);border-color:var(--river);color:#fff;font-weight:600}
+.opt.big{padding:9px 14px;border-radius:10px;flex:1;text-align:center}
+.rental-box[hidden]{display:none}
+.see-btn{display:none;width:100%;margin-top:8px}
+@media (max-width:900px){.see-btn{display:block}}
+
+.btn{border:0;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer;background:var(--river);color:#fff}
+.btn.flare{background:var(--flare)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* results */
+.days{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:thin}
+.day{flex:0 0 auto;min-width:58px;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:6px 8px;text-align:center;cursor:pointer;line-height:1.25}
+.day small{display:block;font-size:11px;color:var(--muted)}
+.day b{font-size:17px;font-variant-numeric:tabular-nums}
+.day.sat small{color:#2F6FD6}.day.sun small{color:var(--flare)}
+.day[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.day[aria-pressed="true"] small{color:inherit;opacity:.8}
+
+.res-h{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:8px 0 12px;flex-wrap:wrap}
+.res-h h2{font-size:20px}
+.res-h p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.sumchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.sumchip{font-size:12px;background:var(--river-soft);color:var(--river);padding:3px 9px;border-radius:999px;font-weight:600}
+
+.list{display:grid;gap:10px}
+.run{display:grid;grid-template-columns:74px 1fr auto;gap:14px;align-items:center;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;cursor:pointer;position:relative}
+.run:hover{border-color:var(--river)}
+.run.full{opacity:.6}
+.run.mine{border-color:var(--river);box-shadow:inset 4px 0 0 var(--river)}
+.r-time b{display:block;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.r-time span{font-size:12px;color:var(--muted)}
+.r-title{font-weight:700;font-size:15.5px}
+.r-meta{font-size:13px;color:var(--muted);margin-top:2px}
+.r-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.chip{font-size:11.5px;padding:2px 8px;border-radius:6px;background:var(--bg);color:var(--muted);font-weight:500}
+.chip.hit{background:var(--river-soft);color:var(--river);font-weight:600}
+.chip.rent{background:var(--flare-soft);color:var(--flare);font-weight:600}
+.r-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px;min-width:76px}
+.match{font-size:22px;font-weight:700;color:var(--river);font-variant-numeric:tabular-nums;line-height:1}
+.match small{font-size:11px;color:var(--muted);font-weight:500;display:block;text-align:right}
+.pill{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--river-soft);color:var(--river);white-space:nowrap}
+.pill.hot{background:var(--flare);color:#fff}
+.pill.closed{background:var(--line);color:var(--muted)}
+.pill.joined{background:var(--ok);color:#fff}
+.spots{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+@media (max-width:520px){
+  .run{grid-template-columns:58px 1fr;gap:10px}
+  .r-side{grid-column:1 / -1;flex-direction:row;align-items:center;justify-content:flex-start;border-top:1px dashed var(--line);padding-top:8px}
+  .match small{display:inline;margin-left:4px}
+}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.create{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px;margin-top:14px;border:1.5px dashed var(--river);border-radius:var(--radius);background:var(--river-soft)}
+.create p{margin:0;font-size:13.5px}
+.create b{display:block;font-size:15px}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(5,15,20,.55);display:flex;align-items:flex-end;justify-content:center;z-index:50;padding:0}
+.overlay[hidden]{display:none}
+.sheet{background:var(--surface);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:20px}
+@media (min-width:700px){.overlay{align-items:center;padding:24px}.sheet{border-radius:18px}}
+.sheet-h{display:flex;justify-content:space-between;align-items:start;gap:12px}
+.sheet h3{font-size:20px}
+.x{border:0;background:var(--bg);width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:18px;flex:0 0 auto}
+.facts{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:14px 0}
+.fact{background:var(--bg);border-radius:10px;padding:9px 11px}
+.fact small{display:block;font-size:11.5px;color:var(--muted)}
+.fact b{font-size:14px}
+.bar{height:8px;background:var(--bg);border-radius:4px;overflow:hidden;margin:6px 0 2px}
+.bar i{display:block;height:100%;background:var(--river)}
+.sec{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}
+.sec h4{margin:0 0 8px;font-size:15px}
+.shop-card{border:1px solid var(--line);border-radius:12px;padding:12px}
+.shop-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.shop-top b{font-size:15px}
+.tag{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:2px}
+.shop-sub{font-size:12.5px;color:var(--muted);margin:2px 0 10px}
+.items{display:grid;gap:6px}
+.item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;background:var(--bg);font-size:13.5px}
+.item input{width:18px;height:18px;accent-color:var(--river)}
+.item .p{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:600}
+.item.na{opacity:.5}
+.warn{background:var(--flare-soft);color:var(--flare);font-size:13px;font-weight:600;padding:9px 11px;border-radius:9px;margin-top:10px}
+.total{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:14px}
+.total b{font-size:18px;font-variant-numeric:tabular-nums}
+.actions{display:flex;gap:8px;margin-top:16px}
+.actions .btn{flex:1}
+
+/* shops & my */
+.page-h{margin-bottom:14px}
+.page-h h2{font-size:22px}
+.page-h p{color:var(--muted);margin:4px 0 0;font-size:14px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.shop-card.near{border-color:var(--river);box-shadow:inset 4px 0 0 var(--river)}
+.mini{display:flex;flex-wrap:wrap;gap:4px}
+.booking{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;display:grid;gap:8px}
+.booking-h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:start}
+.code{font-family:ui-monospace,Menlo,monospace;font-weight:700;letter-spacing:1px;background:var(--river-soft);color:var(--river);padding:2px 8px;border-radius:6px}
+.note{font-size:12px;color:var(--muted);margin-top:18px}
+
+/* 지도 (Leaflet 필수 스타일만 직접 넣음) */
+.leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-tile-container,.leaflet-pane>svg,.leaflet-pane>canvas,.leaflet-layer,.leaflet-zoom-box,.leaflet-image-layer{position:absolute;left:0;top:0}
+.leaflet-container{overflow:hidden;background:#E8EDE6;font-family:var(--font-body);outline:0}
+.leaflet-tile,.leaflet-marker-icon{user-select:none;-webkit-user-drag:none}
+.leaflet-tile{visibility:hidden;filter:saturate(.75)}.leaflet-tile-loaded{visibility:inherit}
+.leaflet-container img.leaflet-tile,.leaflet-container .leaflet-overlay-pane svg{max-width:none!important;max-height:none!important}
+.leaflet-pane{z-index:400}.leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-marker-pane{z-index:600}.leaflet-tooltip-pane{z-index:650}
+.leaflet-marker-icon,.leaflet-pane>svg path,.leaflet-tile-container{pointer-events:none}
+.leaflet-zoom-animated{transform-origin:0 0}
+.leaflet-control{position:relative;z-index:800;pointer-events:auto;float:left;clear:both}
+.leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}.leaflet-top{top:0}.leaflet-bottom{bottom:0}.leaflet-left{left:0}.leaflet-right{right:0}
+.leaflet-right .leaflet-control{float:right}
+.leaflet-left .leaflet-control{margin-left:10px}.leaflet-top .leaflet-control{margin-top:10px}.leaflet-bottom .leaflet-control{margin-bottom:0}
+.leaflet-bar{border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.25);overflow:hidden}
+.leaflet-bar a{display:block;width:30px;height:30px;line-height:30px;text-align:center;background:#fff;color:#222;text-decoration:none;font:700 18px/30px system-ui}
+.leaflet-bar a+a{border-top:1px solid #ddd}
+.leaflet-control-attribution{background:rgba(255,255,255,.85);font-size:10px;padding:0 6px;color:#333}
+.leaflet-control-attribution a{color:#0A7385}
+.leaflet-tooltip{position:absolute;padding:1px 6px;background:rgba(255,255,255,.94);border-radius:6px;color:#0F1E26;font-size:12px;font-weight:700;white-space:nowrap;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.2);border:0}
+.leaflet-tooltip.t-start{background:#0A7385;color:#fff}
+.mk{display:grid;place-items:center;border-radius:50%;color:#fff;font:700 11px/1 system-ui;border:2.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+.mk.s{background:#0A7385}.mk.d{background:#F2542D;border-radius:5px}.mk.m{background:#2B3A44;border-radius:4px}.mk.t{background:#fff;border-color:#F2542D;border-width:3px}
+.lmap{position:absolute;inset:0}
+.map-src{font-size:12px;color:var(--muted);padding:6px 16px 0}
+
+/* browse: 코스 사진 카드 */
+.photo{position:relative;aspect-ratio:16/9;overflow:hidden;background:var(--river-soft)}
+.photo svg,.photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.photo .ph-km{position:absolute;right:10px;top:10px;background:rgba(255,255,255,.9);color:#0F1E26;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px}
+.photo.map{aspect-ratio:8/5;background:#E9EFE6}
+.photo.real{margin:12px 16px 0;border-radius:10px}
+.photo .ml{font-family:var(--font-body);font-weight:700;fill:#0F1E26;paint-order:stroke;stroke:#fff;stroke-width:3.5px;stroke-linejoin:round}
+.photo .rv{display:none}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{display:inline-block;width:12px;height:12px}
+.lg-s{border-radius:50%;background:#0A7385}.lg-r{height:4px!important;background:#F2542D;border-radius:2px}
+.lg-t{border-radius:50%;background:#fff;border:2.5px solid #F2542D;box-sizing:border-box}
+.lg-p{border-radius:50%;background:#0A7385}.lg-m{border-radius:3px;background:#2B3A44}.lg-d{border-radius:3px;background:#F2542D}
+.photo .ph-tag{position:absolute;left:10px;top:10px;background:rgba(10,20,25,.62);color:#fff;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px}
+.browse-h{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.browse-h h2{font-size:22px}
+.browse-h p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.courses{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.course{display:flex;flex-direction:column;text-align:left;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;cursor:pointer}
+.course:hover{border-color:var(--river)}
+.course[aria-pressed="true"]{border-color:var(--river);box-shadow:0 0 0 2px var(--river)}
+.c-body{padding:12px 14px 14px;display:grid;gap:8px}
+.c-name{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.c-name b{font-family:var(--font-display);font-weight:400;font-size:21px}
+.c-name span{font-size:12px;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.stat{background:var(--bg);border-radius:8px;padding:6px 8px;line-height:1.3}
+.stat small{display:block;font-size:11px;color:var(--muted)}
+.stat b{font-size:13px;font-variant-numeric:tabular-nums}
+.cd{margin-top:22px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:18px;align-items:start}
+@media (max-width:860px){.cd{grid-template-columns:1fr}}
+.cd-info{overflow:hidden}
+.cd-info .photo.map{aspect-ratio:8/5}
+.cd-info .c-body{padding:16px}
+.cd-info h3{font-family:var(--font-display);font-weight:400;font-size:26px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13.5px}
+.kv dt{color:var(--muted)}.kv dd{margin:0;font-weight:500}
+.meet{display:grid;grid-template-columns:70px 1fr auto;gap:14px;align-items:center;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;cursor:pointer}
+.meet:hover{border-color:var(--river)}
+.meet.full{opacity:.6}
+.feat{display:grid;grid-template-columns:repeat(4,auto);justify-content:start;gap:4px 14px;margin-top:6px;font-size:12.5px}
+.feat span{color:var(--muted)}.feat b{color:var(--ink);font-weight:600;margin-left:4px;font-variant-numeric:tabular-nums}
+@media (max-width:520px){.meet{grid-template-columns:56px 1fr;gap:10px}.meet .r-side{grid-column:1 / -1;flex-direction:row;align-items:center;justify-content:flex-start;border-top:1px dashed var(--line);padding-top:8px}.feat{grid-template-columns:repeat(2,auto)}}
+.people{width:76px}
+.chip.fixed{background:var(--ink);color:var(--surface);font-weight:600}
+.chip.free{background:var(--flare-soft);color:var(--flare);font-weight:700}
+.filters{display:grid;gap:8px;margin-bottom:16px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+.frow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.f-l{font-size:12.5px;font-weight:700;color:var(--muted);width:64px}
+.lvl{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;border:1px solid currentColor}
+.lvl.b{color:var(--ok)}.lvl.m{color:var(--river)}.lvl.a{color:var(--flare)}
+.people .bar{margin:4px 0 0}
+.sheet .photo{border-radius:12px;margin:-4px 0 14px}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:11px 18px;border-radius:999px;font-size:14px;font-weight:600;z-index:60;box-shadow:0 6px 24px rgba(0,0,0,.2);max-width:calc(100% - 32px);text-align:center}
+.toast[hidden]{display:none}
+@media (prefers-reduced-motion:no-preference){.run,.opt,.day{transition:border-color .15s,background .15s}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <div class="logo"><b>런메이트</b><span>한강에서 나와 맞는 러닝 메이트 찾기</span></div>
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-browse" aria-selected="true" data-view="browse">코스 둘러보기</button>
+      <button class="tab" role="tab" id="tab-find" aria-selected="false" data-view="find">조건으로 찾기</button>
+      <button class="tab" role="tab" id="tab-shops" aria-selected="false" data-view="shops">대여점</button>
+      <button class="tab" role="tab" id="tab-my" aria-selected="false" data-view="my">내 신청<span class="cnt" id="myCnt" hidden>0</span></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- 코스 둘러보기 -->
+  <section class="view" id="view-browse">
+    <div class="browse-h">
+      <div><h2>어느 한강 코스에서 달릴까요?</h2>
+      <p>코스를 누르면 그 코스에서 열리는 모임의 인원, 페이스, 거리를 한눈에 보고 바로 고를 수 있어요.</p></div>
+      <button class="btn ghost" id="toFind">조건을 직접 골라 찾기</button>
+    </div>
+    <div class="filters" id="browseFilters">
+      <div class="frow"><span class="f-l">러닝 방식</span><div class="opts" data-f="style"></div></div>
+      <div class="frow"><span class="f-l">특성</span><div class="opts" data-f="kind"></div></div>
+      <div class="frow"><span class="f-l">거리</span><div class="opts" data-f="dist"></div></div>
+    </div>
+    <div class="courses" id="courseGrid"></div>
+    <div class="cd" id="courseDetail"></div>
+    <p class="note">지도 © OpenStreetMap 기여자. 코스 경로는 런스팟 코스와 실제 지도를 참고해 그린 것으로, 실제 길과 조금 다를 수 있어요.</p>
+  </section>
+
+  <!-- 조건으로 찾기 -->
+  <section class="view" id="view-find" hidden>
+    <div class="find">
+      <aside class="panel survey" aria-label="러닝 조건 설문">
+        <h2>나에게 맞는 러닝 조건</h2>
+        <p class="lead">고를 때마다 오른쪽 추천 모임이 바로 바뀌어요.</p>
+
+        <div class="step">
+          <div class="step-h"><span class="step-n">1</span>기본 정보</div>
+          <div class="q"><div class="q-l">나이대</div><div class="opts" data-key="age" data-mode="single"></div></div>
+          <div class="q"><div class="q-l">성별</div><div class="opts" data-key="gender" data-mode="single"></div></div>
+          <div class="q"><div class="q-l">모임 성별 구성</div><div class="opts" data-key="genderPref" data-mode="single"></div></div>
+        </div>
+
+        <div class="step">
+          <div class="step-h"><span class="step-n">2</span>러닝 스타일</div>
+          <div class="q"><div class="q-l">러닝 방식</div><div class="opts" data-key="style" data-mode="single"></div></div>
+          <div class="q"><div class="q-l">희망 거리</div><div class="opts" data-key="dist" data-mode="single"></div></div>
+          <div class="q"><div class="q-l">평소 페이스 (1km당)</div><div class="opts" data-key="pace" data-mode="single"></div></div>
+          <div class="q"><div class="q-l">선호하는 모임 분위기 (여러 개 가능)</div><div class="opts" data-key="moods" data-mode="multi"></div></div>
+          <div class="q"><div class="q-l">가능한 시간대 (여러 개 가능)</div><div class="opts" data-key="times" data-mode="multi"></div></div>
+        </div>
+
+        <div class="step">
+          <div class="step-h"><span class="step-n">3</span>장소와 러닝 후 모임</div>
+          <div class="q"><div class="q-l">한강 코스 (여러 개 가능, 안 고르면 전체)</div><div class="opts" data-key="courses" data-mode="multi"></div></div>
+          <div class="q"><div class="q-l">러닝 후 소모임</div><div class="opts" data-key="after" data-mode="single"></div></div>
+        </div>
+
+        <div class="step">
+          <div class="step-h"><span class="step-n">4</span>러닝 용품 대여</div>
+          <div class="q"><div class="q-l">모임 장소 근처에서 용품을 빌릴까요?</div><div class="opts" data-key="rental" data-mode="single" data-big="1"></div></div>
+          <div class="q rental-box" id="rentalBox"><div class="q-l">빌리고 싶은 용품 (여러 개 가능)</div><div class="opts" data-key="items" data-mode="multi"></div></div>
+        </div>
+        <button class="btn see-btn" id="seeBtn">추천 모임 보기</button>
+      </aside>
+
+      <section aria-label="추천 모임" id="results">
+        <div class="days" id="days"></div>
+        <div class="res-h">
+          <div><h2 id="resTitle">추천 모임</h2><p id="resSub"></p></div>
+          <div class="opts" id="sortOpts">
+            <button class="opt" aria-pressed="true" data-sort="match">매칭순</button>
+            <button class="opt" aria-pressed="false" data-sort="time">시간순</button>
+          </div>
+        </div>
+        <div class="sumchips" id="sumchips"></div>
+        <div class="list" id="list"></div>
+        <div class="create">
+          <div><b>딱 맞는 모임이 없나요?</b><p>지금 고른 조건 그대로 새 모임을 열고 메이트를 모집해요.</p></div>
+          <button class="btn flare" id="createBtn">내 조건으로 모임 만들기</button>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <!-- 대여점 -->
+  <section class="view" id="view-shops" hidden>
+    <div class="page-h">
+      <h2>한강 코스별 제휴 대여점</h2>
+      <p>모임 출발점 가까운 대여점에서 러닝 용품을 빌리고, 러닝 후 피크닉 용품까지 한 번에 챙길 수 있어요. 테두리가 강조된 곳은 내가 고른 코스의 대여점이에요.</p>
+    </div>
+    <div class="grid2" id="shopGrid"></div>
+    <p class="note">대여점 이름, 가격, 재고는 시연용 예시 데이터예요.</p>
+  </section>
+
+  <!-- 내 신청 -->
+  <section class="view" id="view-my" hidden>
+    <div class="page-h">
+      <h2>내 신청</h2>
+      <p>참여한 모임과 대여 예약이에요. 대여점에서 예약 코드를 보여주면 용품을 받을 수 있어요.</p>
+    </div>
+    <div class="list" id="myList"></div>
+  </section>
+</main>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" id="sheet"></div>
+</div>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ---------- 기본 데이터 ---------- */
+const AGE = [
+  {id:"a1",label:"20대 초반"},{id:"a2",label:"20대 후반"},
+  {id:"a3",label:"30대 초반"},{id:"a4",label:"30대 후반"}
+];
+const GENDER = [{id:"female",label:"여성"},{id:"male",label:"남성"},{id:"none",label:"선택 안 함"}];
+const GENDER_PREF = [{id:"mixed",label:"남녀 모두 좋아요"},{id:"same",label:"같은 성별만"}];
+const DIST = [{id:3,label:"3km"},{id:5,label:"5km"},{id:7,label:"7km"},{id:10,label:"10km"},{id:21,label:"하프 21km"}];
+const PACE = [
+  {id:"p1",label:"7'00\" 이상 · 천천히", short:"7'00\"+"},
+  {id:"p2",label:"6'00\"–7'00\"", short:"6'00\"–7'00\""},
+  {id:"p3",label:"5'00\"–6'00\"", short:"5'00\"–6'00\""},
+  {id:"p4",label:"5'00\" 이내", short:"5'00\" 이내"}
+];
+const MOOD = [
+  {id:"social",label:"친목·대화"},{id:"beginner",label:"입문·처음"},
+  {id:"record",label:"기록·훈련"},{id:"photo",label:"노을·사진"}
+];
+const TIMES = [
+  {id:"wdAM",label:"평일 아침"},{id:"wdPM",label:"평일 저녁"},
+  {id:"weAM",label:"주말 아침"},{id:"wePM",label:"주말 저녁"}
+];
+const AFTER = [
+  {id:"chimaek",label:"치맥"},{id:"cafe",label:"카페"},{id:"picnic",label:"피크닉"},
+  {id:"none",label:"바로 해산"},{id:"any",label:"상관없어요"}
+];
+const STYLE = [{id:"course",label:"정해진 코스"},{id:"free",label:"자유 코스"},{id:"any",label:"상관없어요"}];
+const STYLE_DESC = {course:"모임장이 미리 정한 코스를 다 같이 달려요",free:"다 같이 달리되, 코스는 모인 자리에서 함께 정해요"};
+const RENTAL = [{id:"yes",label:"네, 빌릴래요"},{id:"no",label:"괜찮아요"}];
+const ITEMS = {
+  shoes:{label:"러닝화",price:5000},
+  belt:{label:"러닝벨트·암밴드",price:2000},
+  jacket:{label:"바람막이",price:3000},
+  light:{label:"LED 안전 암밴드",price:1500},
+  locker:{label:"짐 보관함",price:2000},
+  drink:{label:"생수·이온음료",price:1500},
+  mat:{label:"돗자리 (러닝 후 피크닉)",price:4000}
+};
+// img: GitHub 저장소의 images 폴더에 같은 이름으로 사진을 넣으면 그 사진이 보여요. 없으면 일러스트가 대신 보여요.
+// art: 일러스트 색 [하늘 위, 하늘 아래, 해·달, 강물]
+const COURSES = [
+  {id:"yeouido",level:"초보 추천",type:"hangang",name:"여의도",full:"여의도한강공원",start:"여의나루역 인근 물빛광장",feel:"평지 위주, 야경이 좋은 코스",tags:["평지","야경","넓은 광장"],img:"images/yeouido.jpg",art:["#0E1B3D","#34508F","#F5E9C8","#14264D"],night:true},
+  {id:"banpo",level:"초보 추천",type:"hangang",name:"반포",full:"반포한강공원",start:"달빛무지개분수 앞",feel:"분수와 다리 야경, 초보에게 인기",tags:["분수 야경","초보 추천","평지"],img:"images/banpo.jpg",art:["#1B1442","#5A3A8C","#F3E3FF","#1E1A4A"],night:true},
+  {id:"ttukseom",level:"중급",type:"hangang",name:"뚝섬",full:"뚝섬한강공원",start:"자양역 인근 공원 입구",feel:"넓은 잔디밭, 이른 아침 러닝에 좋아요",tags:["넓은 잔디","아침 러닝","피크닉"],img:"images/ttukseom.jpg",art:["#A9DCEE","#FCE7C4","#FFC062","#6FAFC4"]},
+  {id:"mangwon",level:"초보 추천",type:"hangang",name:"망원",full:"망원한강공원",start:"망원나들목 앞",feel:"한적한 강변길, 노을 명소",tags:["노을","한적한 길","카페 거리"],img:"images/mangwon.jpg",art:["#F58A63","#FFD597","#FFF2C4","#5F7DA8"]},
+  {id:"jamsil",level:"고급자",type:"hangang",name:"잠실",full:"잠실한강공원",start:"잠실한강공원 입구 광장",feel:"긴 직선 구간, 장거리 훈련용",tags:["긴 직선","장거리","기록 측정"],img:"images/jamsil.jpg",art:["#86C5E6","#E2F3F8","#FFE08A","#4A92B3"]},
+  {id:"ichon",level:"초보 추천",type:"hangang",name:"이촌",full:"이촌한강공원",start:"이촌한강공원 입구",feel:"잔디와 강변이 가까운 여유로운 코스",tags:["잔디밭","여유로운","노을"],img:"images/ichon.jpg",art:["#5A69AE","#F2A67C","#FFD9A0","#3D5889"]},
+  {id:"jamsugyo",level:"초보 추천",type:"hangang",name:"잠수교",full:"잠수교 코스",start:"반포한강공원 달빛무지개분수 주변",feel:"약 6km 평지, 저녁 분수와 야경이 인기인 초보 코스",tags:["약 6km","야경","평지"],img:"images/jamsugyo.jpg",art:["#151A44","#3E3F8F","#E8F1FF","#1A2150"],night:true},
+  {id:"yeouidopark",level:"초보 추천",type:"park",name:"여의도공원",full:"여의도공원 코스",start:"여의도공원 입구",feel:"약 2.5km 공원 순환, 처음 뛰는 사람에게 추천",tags:["약 2.5km","공원 순환","입문"],img:"images/yeouidopark.jpg",art:["#9FD3EA","#E6F4E8","#FFD36E","#7DB5A0"]},
+  {id:"nodeul",level:"초보 추천",type:"hangang",name:"노들섬",full:"노들섬 코스",start:"노들섬 입구 (한강대교)",feel:"한강 한가운데 섬과 다리를 잇는 노을 코스",tags:["노을","다리 건너기","짧은 순환"],img:"images/nodeul.jpg",art:["#E9795A","#FFC98F","#FFEFC0","#4F6E9E"]},
+  {id:"seoulforest",level:"중급",type:"park",name:"서울숲",full:"서울숲 코스",start:"서울숲 입구 광장",feel:"나무 그늘 숲길을 지나 한강으로 이어지는 코스",tags:["숲길","그늘","한강 연결"],img:"images/seoulforest.jpg",art:["#B7E0D0","#EAF6E6","#FFE29A","#5E9C7C"]},
+  {id:"olympic",level:"고급자",type:"park",name:"올림픽공원",full:"올림픽공원 코스",start:"올림픽공원 평화의문 앞",feel:"오르막이 섞인 넓은 공원 순환, 훈련용",tags:["오르막","넓은 순환","훈련"],img:"images/olympic.jpg",art:["#7FB6DE","#DCEFF7","#FFE08A","#6F9C6A"]}
+];
+const SHOPS = [
+  {id:"s1",course:"yeouido",also:["yeouidopark"],name:"여의 피크닉&런",walk:3,open:"10:00",close:"23:00",items:{shoes:6,belt:12,jacket:8,light:15,locker:20,drink:40,mat:18}},
+  {id:"s2",course:"banpo",also:["jamsugyo"],name:"반포 달빛 대여소",walk:2,open:"11:00",close:"23:00",items:{belt:10,jacket:6,light:12,locker:16,drink:30,mat:22}},
+  {id:"s3",course:"ttukseom",also:["seoulforest"],name:"리버스테이션 뚝섬",walk:4,open:"06:00",close:"22:00",items:{shoes:8,belt:10,locker:24,drink:36,mat:15}},
+  {id:"s4",course:"mangwon",name:"망원 런앤쉼",walk:5,open:"09:00",close:"22:30",items:{belt:8,jacket:10,light:10,locker:12,drink:25,mat:14}},
+  {id:"s5",course:"jamsil",name:"잠실 강변 대여점",walk:6,open:"07:00",close:"22:00",items:{shoes:10,belt:14,light:12,locker:18,drink:30}},
+  {id:"s6",course:"ichon",name:"이촌 나들목 피크닉",walk:3,open:"10:00",close:"22:00",items:{belt:6,jacket:5,locker:10,drink:24,mat:20}},
+  {id:"s7",course:"nodeul",name:"노들 강변 대여소",walk:4,open:"10:00",close:"22:00",items:{belt:8,jacket:6,light:10,locker:12,drink:24,mat:16}}
+];
+// d: 오늘부터 며칠 뒤, ages: AGE 인덱스(빈 배열 = 나이 무관)
+const BASE_RUNS = [
+  {id:"r1",style:"course",course:"yeouido",d:0,time:"19:30",dist:5,pace:"p2",ages:[1,2],gender:"mixed",mood:"social",after:"chimaek",cap:10,joined:7,leader:"한강달림이",title:"퇴근길 야경 5K"},
+  {id:"r2",style:"course",course:"banpo",d:0,time:"20:00",dist:3,pace:"p1",ages:[0,1],gender:"mixed",mood:"beginner",after:"cafe",cap:8,joined:5,leader:"런린이탈출",title:"달빛분수 입문 3K"},
+  {id:"r3",style:"course",course:"ttukseom",d:1,time:"06:40",dist:7,pace:"p3",ages:[2,3],gender:"mixed",mood:"record",after:"none",cap:8,joined:6,leader:"새벽페이서",title:"출근 전 템포런 7K"},
+  {id:"r4",style:"course",course:"mangwon",d:1,time:"19:30",dist:5,pace:"p2",ages:[0,1],gender:"female",mood:"social",after:"cafe",cap:8,joined:6,leader:"망원러너스",title:"여성 러너 노을 5K"},
+  {id:"r5",style:"course",course:"jamsil",d:1,time:"20:00",dist:10,pace:"p3",ages:[1,2,3],gender:"mixed",mood:"record",after:"none",cap:12,joined:9,leader:"빌드업장인",title:"잠실 10K 빌드업"},
+  {id:"r6",style:"free",course:"ichon",d:2,time:"17:30",dist:5,pace:"p1",ages:[],gender:"mixed",mood:"photo",after:"picnic",cap:10,joined:4,leader:"노을수집가",title:"노을 사진 런 + 피크닉"},
+  {id:"r7",style:"course",course:"yeouido",d:2,time:"20:30",dist:10,pace:"p4",ages:[1,2],gender:"male",mood:"record",after:"none",cap:8,joined:7,leader:"서브50",title:"10K 50분 페이스런"},
+  {id:"r8",style:"course",course:"banpo",d:2,time:"06:30",dist:5,pace:"p3",ages:[2,3],gender:"male",mood:"record",after:"none",cap:8,joined:5,leader:"모닝마일",title:"반포 모닝 인터벌"},
+  {id:"r9",style:"free",course:"banpo",d:3,time:"19:30",dist:5,pace:"p2",ages:[1,2],gender:"mixed",mood:"social",after:"chimaek",cap:10,joined:8,leader:"반포크루",title:"수요 치맥런 5K"},
+  {id:"r10",style:"course",course:"ttukseom",d:3,time:"20:00",dist:3,pace:"p1",ages:[0],gender:"mixed",mood:"beginner",after:"cafe",cap:8,joined:3,leader:"새내기러너",title:"대학생 첫 러닝 3K"},
+  {id:"r11",style:"course",course:"mangwon",d:4,time:"07:00",dist:7,pace:"p2",ages:[1,2],gender:"mixed",mood:"photo",after:"cafe",cap:8,joined:5,leader:"아침햇살",title:"망원 아침 강변 7K"},
+  {id:"r12",style:"course",course:"yeouido",d:4,time:"19:30",dist:5,pace:"p3",ages:[0,1],gender:"mixed",mood:"record",after:"cafe",cap:10,joined:10,leader:"페이스메이커",title:"5K 기록 단축반"},
+  {id:"r13",style:"course",course:"yeouido",d:5,time:"08:00",dist:21,pace:"p3",ages:[2,3],gender:"mixed",mood:"record",after:"none",cap:10,joined:6,leader:"하프도전",title:"주말 하프 LSD"},
+  {id:"r14",style:"free",course:"banpo",d:5,time:"09:00",dist:5,pace:"p1",ages:[],gender:"mixed",mood:"beginner",after:"picnic",cap:12,joined:7,leader:"피크닉러버",title:"주말 피크닉 런"},
+  {id:"r15",style:"free",course:"jamsil",d:5,time:"18:00",dist:5,pace:"p2",ages:[0,1],gender:"mixed",mood:"social",after:"chimaek",cap:10,joined:9,leader:"잠실메이트",title:"토요 선셋 치맥런"},
+  {id:"r16",style:"course",course:"ttukseom",d:6,time:"08:30",dist:10,pace:"p2",ages:[1,2],gender:"female",mood:"social",after:"picnic",cap:8,joined:4,leader:"뚝섬언니들",title:"여성 10K 피크닉런"},
+  {id:"r17",style:"free",course:"ichon",d:6,time:"17:30",dist:7,pace:"p2",ages:[2,3],gender:"mixed",mood:"social",after:"chimaek",cap:10,joined:5,leader:"이촌사람들",title:"일요 마무리 7K"},
+  {id:"r18",style:"course",course:"mangwon",d:6,time:"18:30",dist:3,pace:"p1",ages:[0,1],gender:"mixed",mood:"beginner",after:"cafe",cap:8,joined:2,leader:"천천히가자",title:"걷뛰 가능 입문 3K"},
+  {id:"r19",style:"course",course:"jamsugyo",d:0,time:"20:30",dist:5,pace:"p1",ages:[0,1],gender:"mixed",mood:"photo",after:"cafe",cap:10,joined:6,leader:"분수보러가자",title:"잠수교 야경 왕복런"},
+  {id:"r20",style:"free",course:"jamsugyo",d:4,time:"20:00",dist:7,pace:"p2",ages:[1,2],gender:"mixed",mood:"social",after:"chimaek",cap:10,joined:5,leader:"야경헌터",title:"반포·잠수교 자유 코스런"},
+  {id:"r21",style:"course",course:"yeouidopark",d:1,time:"07:00",dist:3,pace:"p1",ages:[],gender:"mixed",mood:"beginner",after:"cafe",cap:8,joined:3,leader:"첫걸음",title:"출근 전 공원 한 바퀴"},
+  {id:"r22",style:"course",course:"yeouidopark",d:5,time:"10:00",dist:3,pace:"p1",ages:[0,1],gender:"female",mood:"beginner",after:"picnic",cap:8,joined:4,leader:"같이뛰어요",title:"여성 입문 공원런"},
+  {id:"r23",style:"free",course:"nodeul",d:2,time:"18:00",dist:5,pace:"p2",ages:[0,1],gender:"mixed",mood:"photo",after:"picnic",cap:10,joined:5,leader:"노을러너",title:"노들섬 노을 자유런"},
+  {id:"r24",style:"course",course:"nodeul",d:6,time:"19:00",dist:3,pace:"p1",ages:[1,2],gender:"mixed",mood:"social",after:"chimaek",cap:8,joined:6,leader:"섬한바퀴",title:"노들섬 순환 3K"},
+  {id:"r25",style:"course",course:"seoulforest",d:3,time:"07:00",dist:5,pace:"p2",ages:[1,2],gender:"mixed",mood:"social",after:"cafe",cap:10,joined:4,leader:"숲속러너",title:"숲길 모닝런 5K"},
+  {id:"r26",style:"free",course:"seoulforest",d:5,time:"17:00",dist:10,pace:"p3",ages:[1,2],gender:"mixed",mood:"record",after:"none",cap:8,joined:5,leader:"성수크루",title:"서울숲·뚝섬 자유 10K"},
+  {id:"r27",style:"course",course:"olympic",d:4,time:"19:30",dist:7,pace:"p4",ages:[1,2,3],gender:"mixed",mood:"record",after:"none",cap:8,joined:6,leader:"언덕왕",title:"오르막 인터벌 7K"},
+  {id:"r28",style:"free",course:"olympic",d:6,time:"08:00",dist:10,pace:"p3",ages:[2,3],gender:"mixed",mood:"record",after:"cafe",cap:10,joined:7,leader:"주말훈련",title:"주말 공원 자유 10K"},
+  {id:"r29",style:"course",course:"jamsil",d:3,time:"20:00",dist:10,pace:"p3",ages:[1,2],gender:"mixed",mood:"record",after:"none",cap:10,joined:4,leader:"방이동러너",title:"방이동 출발 잠실·자양 10K"}
+];
+
+/* ---------- 저장 (이 브라우저에만) ---------- */
+const store = {
+  get(k,f){try{const v=localStorage.getItem("runmate:"+k);return v?JSON.parse(v):f}catch(e){return f}},
+  set(k,v){try{localStorage.setItem("runmate:"+k,JSON.stringify(v))}catch(e){}}
+};
+const DEFAULT_PREFS = {style:"any",age:"a2",gender:"female",genderPref:"mixed",dist:5,pace:"p2",moods:["social"],times:["wdPM","weAM"],courses:[],after:"any",rental:"yes",items:["belt","locker"]};
+let prefs = Object.assign({}, DEFAULT_PREFS, store.get("prefs",{}));
+let myRuns = store.get("myRuns",[]);       // 내가 만든 모임
+let bookings = store.get("bookings",[]);   // {runId, shopId, items[], total, code}
+let dayFilter = "all";
+let sortBy = "match";
+
+/* ---------- 날짜 도우미 ---------- */
+const WD = "일월화수목금토";
+function dateOf(d){const t=new Date();t.setHours(0,0,0,0);t.setDate(t.getDate()+d);return t}
+function isWeekend(d){const w=dateOf(d).getDay();return w===0||w===6}
+function slotOf(run){const h=parseInt(run.time,10);return (isWeekend(run.d)?"we":"wd")+(h<12?"AM":"PM")}
+function dayLabel(d){const t=dateOf(d);if(d===0)return "오늘";if(d===1)return "내일";return (t.getMonth()+1)+"/"+t.getDate()+" ("+WD[t.getDay()]+")"}
+function toMin(s){const [h,m]=s.split(":").map(Number);return h*60+m}
+function fromMin(n){n=(n+1440)%1440;return String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0")}
+
+/* ---------- 조회 도우미 ---------- */
+const byId=(arr,id)=>arr.find(x=>x.id===id);
+const course=id=>byId(COURSES,id);
+const shopFor=cid=>SHOPS.find(s=>s.course===cid||(s.also||[]).includes(cid));
+const allRuns=()=>myRuns.concat(BASE_RUNS);
+const won=n=>n.toLocaleString("ko-KR")+"원";
+function ageText(r){if(!r.ages.length)return "나이 무관";const a=r.ages.map(i=>AGE[i].label);if(a.length===1)return a[0];return a[0].replace(/ (초반|후반)/,m=>m)+"~"+a[a.length-1].replace("대","대")}
+function genderText(g){return g==="female"?"여성 전용":g==="male"?"남성 전용":"혼성"}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+/* ---------- 매칭 점수 ---------- */
+const MAX = 125;
+function score(r){
+  // 성별 전용 모임은 조건이 맞지 않으면 아예 제외
+  if(r.gender==="female" && prefs.gender!=="female") return null;
+  if(r.gender==="male" && prefs.gender!=="male") return null;
+  let s=0; const why=[];
+  if(prefs.genderPref==="same"){
+    if(r.gender!=="mixed"){s+=10;why.push(genderText(r.gender))}
+  } else { s+= r.gender==="mixed"?10:6 }
+  if(prefs.style==="any") s+=10; else if(prefs.style===r.style){s+=10;why.push(byId(STYLE,r.style).label)}
+  const di=DIST.findIndex(x=>x.id===r.dist), pi=DIST.findIndex(x=>x.id===prefs.dist);
+  if(di===pi){s+=25;why.push("거리 일치")} else if(Math.abs(di-pi)===1){s+=12}
+  const rp=+r.pace.slice(1), pp=+prefs.pace.slice(1);
+  if(rp===pp){s+=20;why.push("페이스 일치")} else if(Math.abs(rp-pp)===1){s+=8}
+  const myAge=AGE.findIndex(a=>a.id===prefs.age);
+  if(!r.ages.length){s+=8} else if(r.ages.includes(myAge)){s+=15;why.push("또래 모임")}
+  if(prefs.moods.includes(r.mood)){s+=15;why.push(byId(MOOD,r.mood).label)}
+  if(prefs.times.includes(slotOf(r))){s+=10;why.push(byId(TIMES,slotOf(r)).label)}
+  if(!prefs.courses.length || prefs.courses.includes(r.course)){s+=10; if(prefs.courses.length) why.push("선호 코스")}
+  if(prefs.after==="any"||prefs.after===r.after){s+=5; if(prefs.after!=="any") why.push("러닝 후 "+byId(AFTER,r.after).label)}
+  let rent=false;
+  if(prefs.rental==="yes"){const sh=shopFor(r.course); if(sh){const ok=prefs.items.filter(i=>sh.items[i]).length; if(ok){s+=5;rent=true}}}
+  return {pct:Math.min(100,Math.round(s/MAX*100)), why, rent};
+}
+
+/* ---------- 설문 렌더 ---------- */
+const OPTIONS = {style:STYLE,age:AGE,gender:GENDER,genderPref:GENDER_PREF,dist:DIST,pace:PACE,moods:MOOD,times:TIMES,
+  courses:COURSES.map(c=>({id:c.id,label:c.name})),after:AFTER,rental:RENTAL,
+  items:Object.keys(ITEMS).map(k=>({id:k,label:ITEMS[k].label}))};
+
+function renderSurvey(){
+  document.querySelectorAll(".survey .opts").forEach(box=>{
+    const key=box.dataset.key, multi=box.dataset.mode==="multi";
+    box.innerHTML=OPTIONS[key].map(o=>{
+      const on = multi ? prefs[key].includes(o.id) : prefs[key]===o.id;
+      return '<button type="button" class="opt'+(box.dataset.big?" big":"")+'" id="opt-'+key+'-'+o.id+'" aria-pressed="'+on+'" data-v="'+o.id+'">'+esc(o.label)+'</button>';
+    }).join("");
+  });
+  document.getElementById("rentalBox").hidden = prefs.rental!=="yes";
+}
+document.querySelector(".survey").addEventListener("click",e=>{
+  const b=e.target.closest(".opt"); if(!b) return;
+  const box=b.parentElement, key=box.dataset.key, multi=box.dataset.mode==="multi";
+  let v=b.dataset.v; if(key==="dist") v=+v;
+  if(multi){
+    const arr=prefs[key], i=arr.indexOf(v);
+    if(i>-1){ if((key==="moods"||key==="times") && arr.length===1){toast("하나 이상은 골라 주세요");return} arr.splice(i,1)} else arr.push(v);
+  } else prefs[key]=v;
+  store.set("prefs",prefs);
+  renderSurvey(); renderResults(); renderShops();
+});
+document.getElementById("seeBtn").addEventListener("click",()=>document.getElementById("results").scrollIntoView({behavior:"smooth"}));
+
+/* ---------- 날짜 스트립 ---------- */
+function renderDays(){
+  let h='<button class="day" aria-pressed="'+(dayFilter==="all")+'" data-d="all"><small>7일</small><b>전체</b></button>';
+  for(let d=0; d<7; d++){
+    const t=dateOf(d), w=t.getDay();
+    h+='<button class="day'+(w===6?" sat":w===0?" sun":"")+'" aria-pressed="'+(dayFilter===d)+'" data-d="'+d+'"><small>'+(d===0?"오늘":WD[w])+'</small><b>'+t.getDate()+'</b></button>';
+  }
+  const el=document.getElementById("days"); el.innerHTML=h;
+}
+document.getElementById("days").addEventListener("click",e=>{
+  const b=e.target.closest(".day"); if(!b) return;
+  dayFilter = b.dataset.d==="all" ? "all" : +b.dataset.d;
+  renderDays(); renderResults();
+});
+document.getElementById("sortOpts").addEventListener("click",e=>{
+  const b=e.target.closest(".opt"); if(!b) return;
+  sortBy=b.dataset.sort;
+  document.querySelectorAll("#sortOpts .opt").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  renderResults();
+});
+
+/* ---------- 추천 목록 ---------- */
+function statusOf(r){
+  const booked=bookings.some(b=>b.runId===r.id);
+  const left=r.cap-r.joined;
+  if(booked) return {cls:"joined",txt:"참여 확정"};
+  if(left<=0) return {cls:"closed",txt:"마감"};
+  if(left<=2) return {cls:"hot",txt:"마감 임박"};
+  return {cls:"",txt:"모집 중"};
+}
+function runCard(r,sc){
+  const c=course(r.course), st=statusOf(r);
+  const chips = sc.why.slice(0,4).map(w=>'<span class="chip hit">'+esc(w)+'</span>').join("")
+    + (sc.rent?'<span class="chip rent">대여점 연계</span>':"")
+    + (r.mine?'<span class="chip hit">내가 연 모임</span>':"");
+  const styleTag='<span class="chip '+(r.style==="free"?"free":"fixed")+'">'+byId(STYLE,r.style).label+'</span>';
+  return '<button class="run'+(st.cls==="closed"?" full":"")+(r.mine?" mine":"")+'" data-id="'+r.id+'">'
+    +'<div class="r-time"><b>'+r.time+'</b><span>'+dayLabel(r.d)+'</span></div>'
+    +'<div><div class="r-title">'+esc(c.name)+' · '+esc(r.title)+'</div>'
+    +'<div class="r-meta num">'+r.dist+'km · '+byId(PACE,r.pace).short+' · '+ageText(r)+' · '+genderText(r.gender)+'</div>'
+    +'<div class="r-chips">'+styleTag+chips+'</div></div>'
+    +'<div class="r-side"><span class="match">'+sc.pct+'%<small>매칭</small></span><span class="pill '+st.cls+'">'+st.txt+'</span><span class="spots">'+r.joined+'/'+r.cap+'명</span></div>'
+    +'</button>';
+}
+function renderResults(){
+  let rows = allRuns().map(r=>({r,sc:score(r)})).filter(x=>x.sc && (x.sc.pct>=45 || x.r.mine));
+  if(dayFilter!=="all") rows=rows.filter(x=>x.r.d===dayFilter);
+  rows.sort(sortBy==="match"
+    ? (a,b)=>(b.r.mine?1:0)-(a.r.mine?1:0) || b.sc.pct-a.sc.pct || a.r.d-b.r.d
+    : (a,b)=>a.r.d-b.r.d || toMin(a.r.time)-toMin(b.r.time));
+  const list=document.getElementById("list");
+  list.innerHTML = rows.length ? rows.map(x=>runCard(x.r,x.sc)).join("")
+    : '<div class="panel empty">이 날짜에는 조건에 맞는 모임이 없어요. 다른 날짜를 보거나 아래에서 새 모임을 열어 보세요.</div>';
+  const strong=rows.filter(x=>x.sc.pct>=75).length;
+  document.getElementById("resTitle").textContent = "내 조건에 맞는 모임 "+rows.length+"개";
+  document.getElementById("resSub").textContent = strong ? "그중 매칭 75% 이상인 모임이 "+strong+"개예요." : "조건을 조금 넓히면 더 많은 모임이 보여요.";
+  const sum=[byId(AGE,prefs.age).label, prefs.dist+"km", byId(PACE,prefs.pace).short]
+    .concat(prefs.moods.map(m=>byId(MOOD,m).label))
+    .concat(prefs.courses.length?prefs.courses.map(c=>course(c).name):["한강 전체"])
+    .concat(prefs.rental==="yes"?["대여 "+prefs.items.length+"개"]:[]);
+  document.getElementById("sumchips").innerHTML=sum.map(s=>'<span class="sumchip">'+esc(s)+'</span>').join("");
+}
+document.getElementById("list").addEventListener("click",e=>{const b=e.target.closest(".run"); if(b) openRun(b.dataset.id)});
+
+/* ---------- 모임 상세 + 대여 연결 ---------- */
+const overlay=document.getElementById("overlay"), sheet=document.getElementById("sheet");
+let lastFocus=null;
+function openRun(id){
+  const r=byId(allRuns(),id), c=course(r.course), sh=shopFor(r.course), sc=score(r)||{pct:0,why:[]};
+  const st=statusOf(r), booked=bookings.find(b=>b.runId===id);
+  const pickup=fromMin(toMin(r.time)-20);
+  const openOk = sh && toMin(pickup)>=toMin(sh.open) && toMin(pickup)<=toMin(sh.close);
+  const wantRent = prefs.rental==="yes";
+  let rentHtml="";
+  if(sh){
+    const keys=Object.keys(ITEMS);
+    rentHtml='<div class="sec"><h4>근처 대여점에서 용품 빌리기</h4>'
+      +'<div class="shop-card"><div class="shop-top"><b>'+esc(sh.name)+'<span class="tag">제휴점</span></b><span class="spots">출발점에서 도보 '+sh.walk+'분</span></div>'
+      +'<div class="shop-sub num">영업 '+sh.open+'–'+sh.close+' · 픽업 권장 '+pickup+' (출발 20분 전)</div>'
+      +'<div class="items">'+keys.map(k=>{
+          const has=sh.items[k], chk = has && wantRent && prefs.items.includes(k) && !booked;
+          return '<label class="item'+(has?"":" na")+'"><input type="checkbox" id="it-'+k+'" data-k="'+k+'" '+(has?"":"disabled ")+(chk?"checked ":"")+(booked?"disabled ":"")+'>'
+            +'<span>'+esc(ITEMS[k].label)+(has?' <span class="spots">재고 '+has+'</span>':' <span class="spots">이 대여점에 없음</span>')+'</span>'
+            +'<span class="p">'+won(ITEMS[k].price)+'</span></label>';
+        }).join("")+'</div>'
+      +(openOk?"":'<div class="warn">픽업 시간('+pickup+')에 대여점이 영업 전이에요. 이 모임은 용품을 미리 챙겨 오세요.</div>')
+      +'<div class="total"><span>대여 합계</span><b id="rentTotal">0원</b></div></div></div>';
+  }
+  const fill=Math.round(r.joined/r.cap*100);
+  clearMaps(sheet);
+  sheet.innerHTML = mapHtml(c,true,r.style==="free"?"자유 코스 · 모이는 곳 주변":c.full,r.style!=="free")+
+    '<div class="sheet-h"><div><div class="spots">'+dayLabel(r.d)+' '+r.time+' · '+esc(c.full)+'</div><h3 id="sheetTitle">'+esc(r.title)+'</h3></div><button class="x" id="closeSheet" aria-label="닫기">×</button></div>'
+    +'<div class="facts">'
+      +'<div class="fact"><small>거리 · 페이스</small><b class="num">'+r.dist+'km · '+byId(PACE,r.pace).short+'</b></div>'
+      +'<div class="fact"><small>나이 · 성별</small><b>'+ageText(r)+' · '+genderText(r.gender)+'</b></div>'
+      +'<div class="fact"><small>분위기</small><b>'+byId(MOOD,r.mood).label+'</b></div>'
+      +'<div class="fact"><small>러닝 후</small><b>'+byId(AFTER,r.after).label+'</b></div>'
+    +'</div>'
+    +'<div class="fact" style="margin-bottom:8px"><small>러닝 방식</small><b>'+byId(STYLE,r.style).label+'</b><div class="spots">'+STYLE_DESC[r.style]+(r.style==="free"?' · 권장 거리 '+r.dist+'km 안팎':'')+'</div></div>'
+    +'<div class="fact"><small>'+(r.style==="free"?"모이는 곳":"출발 지점")+'</small><b>'+esc(c.start)+'</b><div class="spots">'+esc(c.feel)+'</div></div>'
+    +'<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>모임장 <b>'+esc(r.leader)+'</b></span><span class="num">'+r.joined+'/'+r.cap+'명 · 매칭 '+sc.pct+'%</span></div><div class="bar"><i style="width:'+fill+'%"></i></div></div>'
+    + rentHtml
+    +'<div class="actions">'
+      +(booked
+        ? '<button class="btn ghost" id="cancelRun">참여 취소</button><button class="btn" id="goMy">내 신청 보기</button>'
+        : st.cls==="closed"
+          ? '<button class="btn" disabled>모집이 마감됐어요</button>'
+          : '<button class="btn" id="joinRun" data-ok="'+(openOk?1:0)+'">참여하기</button>')
+    +'</div>';
+  overlay.hidden=false; lastFocus=document.activeElement;
+  requestAnimationFrame(()=>drawMaps(sheet));
+  document.getElementById("closeSheet").focus();
+  const upd=()=>{
+    const ks=[...sheet.querySelectorAll(".items input:checked")].map(i=>i.dataset.k);
+    const tot=ks.reduce((a,k)=>a+ITEMS[k].price,0);
+    const t=document.getElementById("rentTotal"); if(t) t.textContent=won(tot);
+    const j=document.getElementById("joinRun");
+    if(j) j.textContent = ks.length && openOk ? "참여 + 용품 "+ks.length+"개 대여 예약 ("+won(tot)+")" : "참여하기";
+    return {ks,tot};
+  };
+  sheet.querySelectorAll(".items input").forEach(i=>i.addEventListener("change",upd));
+  upd();
+  document.getElementById("closeSheet").onclick=closeSheet;
+  const j=document.getElementById("joinRun");
+  if(j) j.onclick=()=>{
+    const {ks,tot}=upd(); const rent = ks.length && openOk;
+    const code="RM-"+Math.random().toString(36).slice(2,6).toUpperCase();
+    bookings.push({runId:id,shopId:rent?sh.id:null,items:rent?ks:[],total:rent?tot:0,code});
+    r.joined++; persist(); closeSheet(); refreshAll();
+    toast(rent ? "참여 완료! "+sh.name+"에 대여 예약도 넣었어요" : "참여 완료! 내 신청에서 확인할 수 있어요");
+  };
+  const cx=document.getElementById("cancelRun");
+  if(cx) cx.onclick=()=>{cancel(id); closeSheet()};
+  const gm=document.getElementById("goMy");
+  if(gm) gm.onclick=()=>{closeSheet(); show("my")};
+}
+function closeSheet(){overlay.hidden=true; if(lastFocus) lastFocus.focus()}
+overlay.addEventListener("click",e=>{if(e.target===overlay) closeSheet()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape" && !overlay.hidden) closeSheet()});
+
+function cancel(id){
+  bookings=bookings.filter(b=>b.runId!==id);
+  const r=byId(allRuns(),id); if(r) r.joined=Math.max(r.mine?1:0,r.joined-1);
+  persist(); refreshAll(); toast("참여를 취소했어요. 대여 예약도 함께 취소됐어요");
+}
+function persist(){
+  store.set("bookings",bookings); store.set("myRuns",myRuns);
+  store.set("joined",BASE_RUNS.map(r=>r.joined));
+}
+(function restoreJoined(){const j=store.get("joined",null); if(Array.isArray(j)&&j.length===BASE_RUNS.length) BASE_RUNS.forEach((r,i)=>r.joined=j[i])})();
+
+/* ---------- 내 조건으로 모임 만들기 ---------- */
+const SLOT_TIME={wdAM:"06:40",wdPM:"19:30",weAM:"08:30",wePM:"18:00"};
+document.getElementById("createBtn").addEventListener("click",()=>{
+  // 고른 시간대와 맞는 가장 가까운 날(내일부터)을 찾음
+  let d=1, slot=prefs.times[0];
+  for(let k=1;k<7;k++){
+    const we=isWeekend(k), hit=prefs.times.find(t=>t.startsWith(we?"we":"wd"));
+    if(hit){d=k;slot=hit;break}
+  }
+  const cid = prefs.courses[0] || "yeouido", ai=AGE.findIndex(a=>a.id===prefs.age);
+  const g = prefs.genderPref==="same" && prefs.gender!=="none" ? prefs.gender : "mixed";
+  const run={id:"m"+Date.now(),style:prefs.style==="any"?"course":prefs.style,course:cid,d,time:SLOT_TIME[slot],dist:prefs.dist,pace:prefs.pace,
+    ages:[Math.max(0,ai-1),ai].filter((v,i,a)=>a.indexOf(v)===i),gender:g,mood:prefs.moods[0],
+    after:prefs.after==="any"?"cafe":prefs.after,cap:8,joined:1,leader:"나",mine:true,
+    title:byId(MOOD,prefs.moods[0]).label+" "+(prefs.dist===21?"하프":prefs.dist+"K")+" 메이트 모집"};
+  myRuns.unshift(run);
+  bookings.push({runId:run.id,shopId:null,items:[],total:0,code:"RM-HOST"});
+  persist(); dayFilter="all"; sortBy="match";
+  document.querySelectorAll("#sortOpts .opt").forEach(x=>x.setAttribute("aria-pressed",x.dataset.sort==="match"));
+  refreshAll();
+  document.getElementById("results").scrollIntoView({behavior:"smooth"});
+  toast(course(cid).name+" "+dayLabel(d)+" "+run.time+" 모임을 열었어요. 목록 맨 위에 있어요");
+});
+
+/* ---------- 코스 지도 (실제 지도 위에 경로 표시) ---------- */
+// line: [위도, 경도] 경로 / loop: 순환이면 true, 아니면 강변 왕복 / src: 참고한 코스
+// 좌표는 실제 지도를 보고 고칠 수 있어요. 지도에서 위치를 우클릭하면 위도·경도를 확인할 수 있어요.
+const ROUTES={
+  jamsugyo:{src:"런스팟 '잠수교 코스' 6.0km 순환",km:"6.0km 순환",loop:true,
+    line:[[37.5106,126.9962],[37.5160,126.9955],[37.5214,126.9948],[37.5222,127.0000],[37.5242,127.0055],[37.5268,127.0100],[37.5288,127.0122],[37.5245,127.0133],[37.5205,127.0143],[37.5180,127.0090],[37.5150,127.0040],[37.5125,126.9998],[37.5106,126.9962]],
+    start:[37.5106,126.9962,"달빛무지개분수 출발"],pins:[[37.5160,126.9955,"잠수교"],[37.5245,127.0133,"한남대교"],[37.5113,126.9938,"세빛섬"],[37.5049,127.0049,"고속터미널역","station"]],shop:[37.5098,126.9978]},
+  yeouidopark:{src:"런스팟 '여의도공원 순환코스' 2.6km",km:"2.6km 순환",loop:true,
+    line:[[37.5298,126.9190],[37.5303,126.9213],[37.5212,126.9262],[37.5205,126.9238],[37.5298,126.9190]],
+    start:[37.5252,126.9214,"공원 입구"],pins:[[37.5254,126.9228,"문화의마당"],[37.5216,126.9243,"여의도역","station"],[37.5318,126.9140,"국회의사당"]],shop:[37.5287,126.9318]},
+  nodeul:{src:"런스팟 '노들섬코스' 1.5km",km:"1.5km 순환",loop:true,
+    line:[[37.5178,126.9553],[37.5185,126.9575],[37.5184,126.9605],[37.5177,126.9630],[37.5168,126.9612],[37.5167,126.9575],[37.5178,126.9553]],
+    start:[37.5185,126.9590,"섬 입구"],pins:[[37.5200,126.9590,"한강대교"],[37.5128,126.9532,"노들역","station"]],shop:[37.5172,126.9595]},
+  seoulforest:{src:"런스팟 '서울숲 병아리러너코스' 3.0km",km:"3.0km 순환",loop:true,
+    line:[[37.5470,127.0352],[37.5466,127.0398],[37.5443,127.0423],[37.5420,127.0405],[37.5418,127.0360],[37.5445,127.0338],[37.5470,127.0352]],
+    start:[37.5443,127.0423,"서울숲역 쪽 입구"],pins:[[37.5436,127.0447,"서울숲역","station"],[37.5440,127.0378,"호수"],[37.5400,127.0385,"한강 나들목"]],shop:[37.5430,127.0432]},
+  olympic:{src:"런스팟 '올림픽공원 외순환' 5.0km",km:"5.0km 순환",loop:true,
+    line:[[37.5212,127.1158],[37.5245,127.1200],[37.5242,127.1272],[37.5203,127.1313],[37.5158,127.1302],[37.5137,127.1232],[37.5150,127.1162],[37.5185,127.1140],[37.5212,127.1158]],
+    start:[37.5212,127.1158,"평화의문 출발"],pins:[[37.5180,127.1195,"몽촌토성 (오르막)"],[37.5225,127.1228,"88호수"],[37.5163,127.1307,"올림픽공원역","station"],[37.5174,127.1124,"몽촌토성역","station"]]},
+  yeouido:{km:"강변 왕복",line:[[37.5362,126.9255],[37.5330,126.9298],[37.5300,126.9342],[37.5282,126.9385],[37.5262,126.9432]],
+    start:[37.5300,126.9342,"물빛광장 출발"],pins:[[37.5271,126.9329,"여의나루역","station"],[37.5318,126.9372,"마포대교"],[37.5262,126.9445,"원효대교"],[37.5198,126.9403,"63빌딩"]],shop:[37.5289,126.9330]},
+  banpo:{km:"강변 왕복",line:[[37.5106,126.9962],[37.5097,126.9925],[37.5086,126.9885],[37.5077,126.9845],[37.5072,126.9812]],
+    start:[37.5106,126.9962,"달빛무지개분수"],pins:[[37.5122,126.9958,"반포대교"],[37.5113,126.9938,"세빛섬"],[37.5049,127.0049,"고속터미널역","station"]],shop:[37.5098,126.9978]},
+  ttukseom:{km:"강변 왕복",line:[[37.5293,127.0590],[37.5287,127.0640],[37.5283,127.0690],[37.5272,127.0750],[37.5255,127.0820]],
+    start:[37.5285,127.0670,"자벌레 앞 출발"],pins:[[37.5313,127.0667,"자양역","station"],[37.5262,127.0668,"청담대교"]],shop:[37.5292,127.0700]},
+  jamsil:{km:"강변 왕복",line:[[37.5228,127.0760],[37.5207,127.0830],[37.5193,127.0900],[37.5187,127.0960],[37.5192,127.1020]],
+    start:[37.5193,127.0900,"입구 광장"],pins:[[37.5116,127.0863,"잠실새내역","station"],[37.5228,127.0908,"잠실대교"],[37.5150,127.0730,"종합운동장"]],shop:[37.5182,127.0880]},
+  mangwon:{km:"강변 왕복",line:[[37.5560,126.8928],[37.5532,126.8968],[37.5502,126.8995],[37.5472,126.9020],[37.5448,126.9042]],
+    start:[37.5532,126.8968,"망원나들목"],pins:[[37.5560,126.9101,"망원역","station"],[37.5545,126.8902,"성산대교"],[37.5428,126.9028,"양화대교"]],shop:[37.5525,126.8985]},
+  ichon:{km:"강변 왕복",line:[[37.5182,126.9625],[37.5174,126.9680],[37.5170,126.9740],[37.5174,126.9800],[37.5188,126.9860]],
+    start:[37.5170,126.9740,"공원 입구"],pins:[[37.5222,126.9748,"이촌역","station"],[37.5150,126.9810,"동작대교"]],shop:[37.5178,126.9755]}
+};
+let liveMaps=[];
+function drawMaps(root){
+  if(typeof L==="undefined"){root.querySelectorAll(".lmap").forEach(el=>el.innerHTML='<div class="empty">지도를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.</div>');return}
+  root.querySelectorAll(".lmap").forEach(el=>{
+    if(el._done) return; el._done=true;
+    const R=ROUTES[el.dataset.c], big=el.dataset.big==="1", showRoute=el.dataset.route!=="0";
+    const m=L.map(el,{zoomControl:big,attributionControl:big,dragging:big,scrollWheelZoom:false,doubleClickZoom:big,boxZoom:false,keyboard:false,touchZoom:big,zoomSnap:0.25});
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(m);
+    const icon=(cls,txt,sz)=>L.divIcon({className:"",html:'<div class="mk '+cls+'" style="width:'+sz+'px;height:'+sz+'px">'+txt+'</div>',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]});
+    const pts=[];
+    if(showRoute){
+      L.polyline(R.line,{color:"#fff",weight:big?10:8,opacity:.95,lineJoin:"round"}).addTo(m);
+      L.polyline(R.line,{color:"#F2542D",weight:big?5.5:4.5,lineJoin:"round"}).addTo(m);
+      L.polyline(R.line,{color:"#fff",weight:1.5,dashArray:"4 8"}).addTo(m);
+      pts.push(...R.line);
+      if(!R.loop){const e=R.line[R.line.length-1]; const t=L.marker(e,{icon:icon("t","",14)}).addTo(m); if(big) t.bindTooltip("반환점",{permanent:true,direction:"top",offset:[0,-8]});}
+    } else {
+      L.circle([R.start[0],R.start[1]],{radius:450,color:"#F2542D",weight:2,dashArray:"5 6",fillColor:"#F2542D",fillOpacity:.08}).addTo(m);
+      pts.push(...R.line);
+    }
+    R.pins.forEach(p=>{
+      const st=p[3]==="station";
+      const mk=st?L.marker([p[0],p[1]],{icon:icon("m","M",big?18:16)}):L.circleMarker([p[0],p[1]],{radius:big?6:5,color:"#fff",weight:2,fillColor:"#0A7385",fillOpacity:1});
+      mk.addTo(m); pts.push([p[0],p[1]]);
+      if(big||st) mk.bindTooltip(p[2],{permanent:true,direction:"top",offset:[0,st?-9:-6]});
+    });
+    if(R.shop && shopFor(el.dataset.c)){const d=L.marker(R.shop,{icon:icon("d","대",big?20:16)}).addTo(m); if(big) d.bindTooltip("대여점",{permanent:true,direction:"right",offset:[10,0]});}
+    const s=L.marker([R.start[0],R.start[1]],{icon:icon("s","S",big?24:20),zIndexOffset:500}).addTo(m);
+    s.bindTooltip(R.start[2],{permanent:true,direction:"bottom",offset:[0,10],className:"t-start"});
+    m.fitBounds(L.latLngBounds(pts),{padding:big?[36,36]:[22,22]});
+    liveMaps.push(m);
+  });
+}
+function clearMaps(root){liveMaps=liveMaps.filter(m=>{if(root.contains(m.getContainer())){m.remove();return false}return true})}
+function mapHtml(c,big,tag,route){
+  const R=ROUTES[c.id];
+  return '<div class="photo map"><div class="lmap" data-c="'+c.id+'" data-big="'+(big?1:0)+'" data-route="'+(route===false?0:1)+'"></div>'
+    +(tag?'<span class="ph-tag" style="z-index:1100">'+esc(tag)+'</span>':'')
+    +'<span class="ph-km" style="z-index:1100">'+(route===false?"코스는 모여서 결정":R.km)+'</span></div>';
+}
+function realPhoto(c){
+  return '<div class="photo real"><img src="'+c.img+'" alt="'+esc(c.full)+' 사진" loading="lazy" onerror="this.parentElement.remove()"></div>';
+}
+const MAP_LEGEND='<div class="legend"><span><i class="lg-s"></i>출발</span><span><i class="lg-r"></i>러닝 코스</span><span><i class="lg-t"></i>반환점</span><span><i class="lg-p"></i>주요 지점</span><span><i class="lg-m"></i>지하철역</span><span><i class="lg-d"></i>대여점</span></div>';
+
+/* ---------- 코스 둘러보기 ---------- */
+let browseCourse="yeouido";
+const BF={style:"all",kind:"all",dist:"all"};
+const BF_OPTS={
+  style:[{id:"all",label:"전체"},{id:"course",label:"정해진 코스"},{id:"free",label:"자유 코스"}],
+  kind:[{id:"all",label:"전체"},{id:"hangang",label:"한강 코스"},{id:"park",label:"공원 코스"},{id:"초보 추천",label:"초보 추천"},{id:"고급자",label:"고급자 코스"}],
+  dist:[{id:"all",label:"전체"},{id:"s",label:"5km 이하"},{id:"m",label:"5–10km"},{id:"l",label:"10km 이상"}]
+};
+function runPass(r){
+  if(BF.style!=="all" && r.style!==BF.style) return false;
+  if(BF.dist==="s" && r.dist>5) return false;
+  if(BF.dist==="m" && (r.dist<5||r.dist>10)) return false;
+  if(BF.dist==="l" && r.dist<10) return false;
+  return true;
+}
+function coursePass(c){
+  if(BF.kind==="hangang"||BF.kind==="park"){ if(c.type!==BF.kind) return false }
+  else if(BF.kind!=="all" && c.level!==BF.kind) return false;
+  return true;
+}
+const lvlCls=l=>l==="초보 추천"?"b":l==="중급"?"m":"a";
+document.getElementById("browseFilters").addEventListener("click",e=>{
+  const b=e.target.closest(".opt"); if(!b) return;
+  BF[b.parentElement.dataset.f]=b.dataset.v; renderBrowse();
+});
+const PACE_WORD=["천천히","보통","빠름","매우 빠름"];
+function paceRange(rs){const ps=rs.map(r=>+r.pace.slice(1));if(!ps.length)return "-";const lo=Math.min(...ps),hi=Math.max(...ps);return lo===hi?PACE_WORD[lo-1]+" ("+PACE[lo-1].short+")":PACE_WORD[lo-1]+" ~ "+PACE_WORD[hi-1]}
+function renderBrowse(){
+  clearMaps(document.getElementById("view-browse"));
+  document.querySelectorAll("#browseFilters .opts").forEach(box=>{
+    const f=box.dataset.f;
+    box.innerHTML=BF_OPTS[f].map(o=>'<button type="button" class="opt" id="bf-'+f+'-'+o.id+'" aria-pressed="'+(BF[f]===o.id)+'" data-v="'+o.id+'">'+o.label+'</button>').join("");
+  });
+  const runs=allRuns().filter(runPass);
+  const anyFilter=BF.style!=="all"||BF.dist!=="all";
+  const vis=COURSES.filter(c=>coursePass(c) && (!anyFilter || runs.some(r=>r.course===c.id)));
+  if(!vis.length){
+    document.getElementById("courseGrid").innerHTML='<div class="panel empty" style="grid-column:1/-1">이 조건에 맞는 코스가 없어요. 필터를 하나 풀어 보세요.</div>';
+    document.getElementById("courseDetail").innerHTML=""; return;
+  }
+  if(!vis.some(c=>c.id===browseCourse)) browseCourse=vis[0].id;
+  document.getElementById("courseGrid").innerHTML=vis.map(c=>{
+    const rs=runs.filter(r=>r.course===c.id), open=rs.filter(r=>r.joined<r.cap).length;
+    const nFree=rs.filter(r=>r.style==="free").length;
+    const caps=rs.map(r=>r.cap), dists=[...new Set(rs.map(r=>r.dist))].sort((a,b)=>a-b);
+    return '<button class="course" aria-pressed="'+(browseCourse===c.id)+'" data-c="'+c.id+'">'
+      +mapHtml(c,false,"이번 주 모임 "+rs.length+"개")
+      +'<div class="c-body"><div class="c-name"><b>'+esc(c.name)+'</b><span class="lvl '+lvlCls(c.level)+'">'+c.level+'</span></div>'
+      +'<div class="r-chips">'+c.tags.map(t=>'<span class="chip">'+esc(t)+'</span>').join("")+'</div>'
+      +'<div class="stats">'
+        +'<div class="stat"><small>코스 · 자유</small><b>'+(rs.length-nFree)+' · '+nFree+'</b></div>'
+        +'<div class="stat"><small>인원</small><b>'+(caps.length?(Math.min(...caps)===Math.max(...caps)?Math.min(...caps)+"명":Math.min(...caps)+"~"+Math.max(...caps)+"명"):"-")+'</b></div>'
+        +'<div class="stat"><small>거리</small><b>'+(dists.join("·")||"-")+(dists.length?"km":"")+'</b></div>'
+      +'</div></div></button>';
+  }).join("");
+
+  const c=course(browseCourse), sh=shopFor(c.id);
+  const rs=runs.filter(r=>r.course===c.id).sort((a,b)=>a.d-b.d||toMin(a.time)-toMin(b.time));
+  document.getElementById("courseDetail").innerHTML=
+    '<div class="panel cd-info">'+mapHtml(c,true)+'<div style="padding:10px 16px 0">'+MAP_LEGEND+'</div>'+(ROUTES[c.id].src?'<div class="map-src">참고: '+esc(ROUTES[c.id].src)+'</div>':'')+realPhoto(c)
+    +'<div class="c-body"><h3>'+esc(c.full)+'</h3><p style="margin:0;color:var(--muted)">'+esc(c.feel)+'</p>'
+    +'<dl class="kv"><dt>출발 지점</dt><dd>'+esc(c.start)+'</dd>'
+    +'<dt>코스 난이도</dt><dd>'+c.level+' · '+(c.type==="park"?"공원 코스":"한강 코스")+'</dd>'
+    +'<dt>페이스 범위</dt><dd class="num">'+paceRange(rs)+'</dd>'
+    +'<dt>근처 대여점</dt><dd>'+(sh?esc(sh.name)+' · 도보 '+sh.walk+'분 · '+sh.open+'–'+sh.close:'없음')+'</dd>'
+    +(sh?'<dt>대여 용품</dt><dd>'+Object.keys(sh.items).map(k=>ITEMS[k].label).join(", ")+'</dd>':'')
+    +'</dl></div></div>'
+    +'<div><div class="res-h" style="margin-top:0"><div><h2>'+esc(c.name)+' 모임 '+rs.length+'개</h2><p>정해진 코스는 미리 정한 길로, 자유 코스는 모인 자리에서 함께 길을 정해 다 같이 달려요.</p></div></div>'
+    +'<div class="list">'+(rs.length?rs.map(meetCard).join(""):'<div class="panel empty">이번 주에는 이 코스 모임이 없어요. 조건으로 찾기에서 새 모임을 열어 보세요.</div>')+'</div></div>';
+  requestAnimationFrame(()=>drawMaps(document.getElementById("view-browse")));
+}
+function meetCard(r){
+  const st=statusOf(r), fill=Math.round(r.joined/r.cap*100);
+  return '<button class="meet'+(st.cls==="closed"?" full":"")+'" data-id="'+r.id+'">'
+    +'<div class="r-time"><b>'+r.time+'</b><span>'+dayLabel(r.d)+'</span></div>'
+    +'<div><div class="r-title">'+esc(r.title)+'</div>'
+    +'<div class="feat"><span>거리<b>'+(r.dist===21?"하프":r.dist+"km")+'</b></span><span>페이스<b>'+byId(PACE,r.pace).short+'</b></span><span>나이<b>'+ageText(r)+'</b></span><span>성별<b>'+genderText(r.gender)+'</b></span></div>'
+    +'<div class="r-chips"><span class="chip '+(r.style==="free"?"free":"fixed")+'">'+byId(STYLE,r.style).label+'</span><span class="chip">'+byId(MOOD,r.mood).label+'</span><span class="chip">러닝 후 '+byId(AFTER,r.after).label+'</span>'+(r.mine?'<span class="chip hit">내가 연 모임</span>':'')+'</div></div>'
+    +'<div class="r-side"><span class="pill '+st.cls+'">'+st.txt+'</span><div class="people"><span class="spots">'+r.joined+'/'+r.cap+'명</span><div class="bar"><i style="width:'+fill+'%"></i></div></div></div>'
+    +'</button>';
+}
+document.getElementById("courseGrid").addEventListener("click",e=>{
+  const b=e.target.closest(".course"); if(!b) return;
+  browseCourse=b.dataset.c; renderBrowse();
+  document.getElementById("courseDetail").scrollIntoView({behavior:"smooth",block:"start"});
+});
+document.getElementById("courseDetail").addEventListener("click",e=>{const b=e.target.closest(".meet"); if(b) openRun(b.dataset.id)});
+document.getElementById("toFind").addEventListener("click",()=>show("find"));
+
+/* ---------- 대여점 탭 ---------- */
+function renderShops(){
+  document.getElementById("shopGrid").innerHTML=SHOPS.map(sh=>{
+    const c=course(sh.course), near=prefs.courses.includes(sh.course);
+    const cnt=allRuns().filter(r=>r.course===sh.course).length;
+    return '<div class="shop-card panel'+(near?" near":"")+'">'
+      +'<div class="shop-top"><b>'+esc(sh.name)+'</b><span class="pill">'+esc(c.name)+'</span></div>'
+      +'<div class="shop-sub num">'+esc(c.start)+'에서 도보 '+sh.walk+'분 · 영업 '+sh.open+'–'+sh.close+' · 이번 주 연계 모임 '+cnt+'개</div>'
+      +'<div class="items">'+Object.keys(sh.items).map(k=>{
+        const want=prefs.rental==="yes"&&prefs.items.includes(k);
+        return '<div class="item"><span>'+esc(ITEMS[k].label)+(want?' <span class="chip hit">내 선택</span>':'')+'</span><span class="spots" style="margin-left:auto">재고 '+sh.items[k]+'</span><span class="p">'+won(ITEMS[k].price)+'</span></div>';
+      }).join("")+'</div></div>';
+  }).join("");
+}
+
+/* ---------- 내 신청 탭 ---------- */
+function renderMy(){
+  const el=document.getElementById("myList"), cnt=document.getElementById("myCnt");
+  cnt.hidden=!bookings.length; cnt.textContent=bookings.length;
+  if(!bookings.length){el.innerHTML='<div class="panel empty">아직 참여한 모임이 없어요. 모임 찾기에서 마음에 드는 모임을 골라 보세요.</div>';return}
+  el.innerHTML=bookings.map(b=>{
+    const r=byId(allRuns(),b.runId); if(!r) return "";
+    const c=course(r.course), sh=b.shopId?byId(SHOPS,b.shopId):null;
+    return '<div class="booking"><div class="booking-h"><div><div class="spots">'+dayLabel(r.d)+' '+r.time+' · '+esc(c.full)+'</div><b style="font-size:16px">'+esc(r.title)+'</b></div>'
+      +'<span class="pill joined">'+(r.mine?"내가 연 모임":"참여 확정")+'</span></div>'
+      +'<div class="r-meta num">'+r.dist+'km · '+byId(PACE,r.pace).short+' · 출발 '+esc(c.start)+' · '+r.joined+'/'+r.cap+'명</div>'
+      +(sh?'<div class="item"><span><b>'+esc(sh.name)+'</b> 픽업 '+fromMin(toMin(r.time)-20)+'<br><span class="spots">'+b.items.map(k=>ITEMS[k].label).join(", ")+'</span></span><span class="p">'+won(b.total)+'</span></div>'
+          +'<div style="font-size:13px">예약 코드 <span class="code">'+b.code+'</span></div>':'<div class="spots">대여 예약 없음</div>')
+      +'<div><button class="btn ghost" data-cancel="'+r.id+'">'+(r.mine?"모임 닫기":"참여 취소")+'</button></div></div>';
+  }).join("");
+}
+document.getElementById("myList").addEventListener("click",e=>{
+  const b=e.target.closest("[data-cancel]"); if(!b) return;
+  const id=b.dataset.cancel;
+  if(id.startsWith("m")){myRuns=myRuns.filter(r=>r.id!==id); bookings=bookings.filter(x=>x.runId!==id); persist(); refreshAll(); toast("내가 연 모임을 닫았어요")}
+  else cancel(id);
+});
+
+/* ---------- 탭 ---------- */
+function show(v){
+  document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected",t.dataset.view===v));
+  ["browse","find","shops","my"].forEach(x=>document.getElementById("view-"+x).hidden = x!==v);
+  window.scrollTo(0,0);
+  if(v==="browse") requestAnimationFrame(()=>liveMaps.forEach(m=>m.invalidateSize()));
+}
+document.querySelector(".tabs").addEventListener("click",e=>{const t=e.target.closest(".tab"); if(t) show(t.dataset.view)});
+
+/* ---------- 토스트 ---------- */
+let tt; function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2600)}
+
+function refreshAll(){renderBrowse();renderDays();renderResults();renderShops();renderMy()}
+renderSurvey(); refreshAll();
+})();
+</script>
+</body>
+</html>
